@@ -27,6 +27,8 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
 
     public static final String PROVIDER_ID = "organization-audience-mapper";
 
+    public static final String TOKEN_CLAIM_NAME = "audienceClaimName";
+
     /*
      * A config which keycloak uses to display a generic dialog to configure the token.
      */
@@ -34,7 +36,7 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
 
     static {
         ProviderConfigProperty tokenClaimName = new ProviderConfigProperty();
-        tokenClaimName.setName(OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME);
+        tokenClaimName.setName(TOKEN_CLAIM_NAME);
         tokenClaimName.setLabel(OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME_LABEL);
         tokenClaimName.setType(ProviderConfigProperty.STRING_TYPE);
         tokenClaimName.setHelpText(OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME_TOOLTIP);
