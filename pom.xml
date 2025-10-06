@@ -5,10 +5,9 @@
 
   <groupId>com.cleansightsolutions.keycloak</groupId>
   <artifactId>keycloak-tableau-aud-mapper</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
 
   <name>keycloak-tableau-aud-mapper</name>
-  <!-- FIXME change it to the project's website -->
   <url>https://www.cleansightsolutions.com</url>
 
   <properties>
