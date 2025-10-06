@@ -40,7 +40,7 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
 
     @Override
     public String getDisplayCategory() {
-        return "Token Mapper";
+        return "Token mapper";
     }
 
     @Override
@@ -106,8 +106,15 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
         }
 
         // Merge with existing aud claim if present
-        new HashSet<>(audiencesFromOrganizations)
-            .stream()
-            .map(aud -> token.addAudience(aud));
+        Set<String> completeAudiences = new HashSet<>(audiencesFromOrganizations);
+
+        String[] existingAudiences = token.getAudience();
+
+        if (existingAudiences != null) {
+            completeAudiences.addAll(List.of(existingAudiences));
+        }
+
+        // Overwrite the existing audiences claim with our new one
+        token.getOtherClaims().put("aud", new ArrayList<>(completeAudiences));
     }
 }
