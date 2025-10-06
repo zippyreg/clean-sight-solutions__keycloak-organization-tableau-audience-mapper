@@ -1,11 +1,13 @@
 package com.cleansightsolutions.keycloak.protocol.oidc.mappers;
 
-
+import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.mappers.AbstractOIDCProtocolMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCAccessTokenMapper;
 import org.keycloak.protocol.oidc.mappers.OIDCAttributeMapperHelper;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.representations.IDToken;
+import org.keycloak.representations.AccessToken;
+import org.keycloak.utils.RoleResolveUtil;
 import org.keycloak.models.ClientSessionContext;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ProtocolMapperModel;
@@ -13,8 +15,12 @@ import org.keycloak.models.UserModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.organization.OrganizationProvider;
 
+import static org.keycloak.protocol.oidc.mappers.OIDCAttributeMapperHelper.INCLUDE_IN_ACCESS_TOKEN;
+import static org.keycloak.protocol.oidc.mappers.OIDCAttributeMapperHelper.INCLUDE_IN_INTROSPECTION;
+
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,9 +31,7 @@ import java.util.stream.Collectors;
 public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
         implements OIDCAccessTokenMapper {
 
-    public static final String PROVIDER_ID = "organization-audience-mapper";
-
-    public static final String TOKEN_CLAIM_NAME = "audienceClaimName";
+    public static final String PROVIDER_ID = "oidc-organization-audience-mapper";
 
     /*
      * A config which keycloak uses to display a generic dialog to configure the token.
@@ -40,7 +44,7 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
 
     @Override
     public String getDisplayCategory() {
-        return "Token mapper";
+        return TOKEN_MAPPER_CATEGORY;
     }
 
     @Override
@@ -50,7 +54,7 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
 
     @Override
     public String getHelpText() {
-        return "Adds an 'aud' (audience) claim containing organization audience values defined by the 'audience' attribute.";
+        return "Adds 'aud' (audience) claims for each audience attribute of every organization the user is associated with.";
     }
 
     @Override
@@ -64,15 +68,53 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
     }
 
     @Override
-    protected void setClaim(
-        IDToken token,
-        ProtocolMapperModel mappingModel,
-        UserSessionModel userSession,
-        KeycloakSession keycloakSession,
-        ClientSessionContext clientSessionCtx
-    ) {
+    public AccessToken transformAccessToken(AccessToken token, ProtocolMapperModel mappingModel, KeycloakSession keycloakSession,
+                                            UserSessionModel userSession, ClientSessionContext clientSessionCtx) {
+        boolean shouldUseLightweightToken = getShouldUseLightweightToken(keycloakSession);
+        boolean includeInAccessToken = shouldUseLightweightToken ?  OIDCAttributeMapperHelper.includeInLightweightAccessToken(mappingModel) : includeInAccessToken(mappingModel);
+        if (!includeInAccessToken){
+            return token;
+        }
+        setAudience(token, userSession, keycloakSession);
+        return token;
+    }
+
+    private boolean includeInAccessToken(ProtocolMapperModel mappingModel) {
+        String includeInAccessToken = mappingModel.getConfig().get(INCLUDE_IN_ACCESS_TOKEN);
+
+        // Backwards compatibility
+        if (includeInAccessToken == null) {
+            return true;
+        }
+
+        return "true".equals(includeInAccessToken);
+    }
+
+    @Override
+    public AccessToken transformIntrospectionToken(AccessToken token, ProtocolMapperModel mappingModel, KeycloakSession keycloakSession,
+                                                   UserSessionModel userSession, ClientSessionContext clientSessionCtx) {
+        if (!includeInIntrospection(mappingModel)) {
+            return token;
+        }
+
+        setAudience(token, userSession, keycloakSession);
+        return token;
+    }
+
+    private boolean includeInIntrospection(ProtocolMapperModel mappingModel) {
+        String includeInIntrospection = mappingModel.getConfig().get(INCLUDE_IN_INTROSPECTION);
+
+        // Backwards compatibility
+        if (includeInIntrospection == null) {
+            return true;
+        }
+
+        return "true".equals(includeInIntrospection);
+    }
+
+    private void setAudience(AccessToken token, UserSessionModel userSession, KeycloakSession session) {
         UserModel user = userSession.getUser();
-        OrganizationProvider orgProvider = keycloakSession.getProvider(OrganizationProvider.class);
+        OrganizationProvider orgProvider = session.getProvider(OrganizationProvider.class);
 
         if (orgProvider == null) {
             return;
@@ -108,13 +150,28 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
         // Merge with existing aud claim if present
         Set<String> completeAudiences = new HashSet<>(audiencesFromOrganizations);
 
-        String[] existingAudiences = token.getAudience();
-
-        if (existingAudiences != null) {
-            completeAudiences.addAll(List.of(existingAudiences));
+        for (String audience : completeAudiences) {
+            token.addAudience(audience);
         }
+    }
 
-        // Overwrite the existing audiences claim with our new one
-        token.getOtherClaims().put("aud", new ArrayList<>(completeAudiences));
+     public static ProtocolMapperModel createClaimMapper(String name, boolean accessToken, boolean introspectionEndpoint) {
+        ProtocolMapperModel mapper = new ProtocolMapperModel();
+        mapper.setName(name);
+        mapper.setProtocolMapper(PROVIDER_ID);
+        mapper.setProtocol(OIDCLoginProtocol.LOGIN_PROTOCOL);
+        Map<String, String> config = new HashMap<>();
+        if (accessToken) {
+            config.put(INCLUDE_IN_ACCESS_TOKEN, "true");
+        } else {
+            config.put(INCLUDE_IN_ACCESS_TOKEN, "false");
+        }
+        if (introspectionEndpoint) {
+            config.put(INCLUDE_IN_INTROSPECTION, "true");
+        } else {
+            config.put(INCLUDE_IN_INTROSPECTION, "false");
+        }
+        mapper.setConfig(config);
+        return mapper;
     }
 }

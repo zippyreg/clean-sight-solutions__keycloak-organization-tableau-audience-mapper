@@ -5,7 +5,7 @@
 
   <groupId>com.cleansightsolutions.keycloak</groupId>
   <artifactId>keycloak-tableau-aud-mapper</artifactId>
-  <version>1.0.4</version>
+  <version>1.0.5</version>
 
   <name>keycloak-tableau-aud-mapper</name>
   <url>https://www.cleansightsolutions.com</url>
