@@ -17,7 +17,7 @@ jobs:
       steps:
         - uses: actions/checkout@v4
         - name: get-pom-version
-          uses: PERES-Richard/maven-get-version-action@v3.0.0
+          uses: CptMokoena/maven-get-version-action@master
           id: get-version
     create_github_release:
       name: "2. Create Github Release"
