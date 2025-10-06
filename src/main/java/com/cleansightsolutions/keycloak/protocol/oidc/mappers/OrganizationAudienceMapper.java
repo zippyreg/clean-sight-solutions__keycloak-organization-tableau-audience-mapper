@@ -35,14 +35,6 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
     private static final List<ProviderConfigProperty> configProperties = new ArrayList<>();
 
     static {
-        ProviderConfigProperty tokenClaimName = new ProviderConfigProperty();
-        tokenClaimName.setName(TOKEN_CLAIM_NAME);
-        tokenClaimName.setLabel(OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME_LABEL);
-        tokenClaimName.setType(ProviderConfigProperty.STRING_TYPE);
-        tokenClaimName.setHelpText(OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME_TOOLTIP);
-        tokenClaimName.setDefaultValue("aud");
-        configProperties.add(tokenClaimName);
-
         OIDCAttributeMapperHelper.addIncludeInTokensConfig(configProperties, OrganizationAudienceMapper.class);
     }
 
@@ -87,7 +79,7 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
         }
 
         // Only include organizations that define an 'audience' attribute
-        List<String> audiences = orgProvider.getByMember(user)
+        List<String> audiencesFromOrganizations = orgProvider.getByMember(user)
                 .map(orgModel -> {
                     Map<String, List<String>> attributes = orgModel.getAttributes();
 
@@ -109,25 +101,13 @@ public class OrganizationAudienceMapper extends AbstractOIDCProtocolMapper
                 .filter(aud -> !aud.isBlank())
                 .collect(Collectors.toList());
 
-        if (audiences.isEmpty()) {
+        if (audiencesFromOrganizations.isEmpty()) {
             return;
         }
 
-        String claimName = mappingModel.getConfig().getOrDefault(
-            OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME,
-            "aud"
-        );
-
         // Merge with existing aud claim if present
-        Object existingAud = token.getOtherClaims().get(claimName);
-        Set<String> merged = new HashSet<>(audiences);
-
-        if (existingAud instanceof Collection<?>) {
-            ((Collection<?>) existingAud).forEach(a -> merged.add(a.toString()));
-        } else if (existingAud instanceof String) {
-            merged.add(existingAud.toString());
-        }
-
-        token.getOtherClaims().put(claimName, new ArrayList<>(merged));
+        new HashSet<>(audiencesFromOrganizations)
+            .stream()
+            .map(aud -> token.addAudience(aud));
     }
 }
